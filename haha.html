@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitoring Driver Luar Kota</title>
+    <!-- Library SheetJS untuk membaca file Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f7f6;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .form-container {
+            background-color: #ffffff;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 500px;
+        }
+        h2 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input[type="text"], input[type="date"], input[type="number"], select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #0056b3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #004494;
+        }
+        .loading-text {
+            font-size: 12px;
+            color: #d9534f;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="form-container">
+        <h2>Data Cek Kesehatan Driver</h2>
+        <form id="driverForm">
+            
+            <div class="form-group">
+                <label for="tanggal">Tanggal</label>
+                <input type="date" id="tanggal" name="tanggal" required>
+            </div>
+
+            <div class="form-group">
+                <label for="namaDriver">Nama Driver <span id="loadDriver" class="loading-text">(Memuat data dari Excel...)</span></label>
+                <!-- Dikosongkan, akan diisi otomatis dari Excel -->
+                <select id="namaDriver" name="namaDriver" required>
+                    <option value="" disabled selected>Pilih Driver</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="nopol">Nopol Kendaraan <span id="loadNopol" class="loading-text">(Memuat data dari Excel...)</span></label>
+                <!-- Dikosongkan, akan diisi otomatis dari Excel -->
+                <select id="nopol" name="nopol" required>
+                    <option value="" disabled selected>Pilih Nopol</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="tujuan">Tujuan Pengiriman</label>
+                <input type="text" id="tujuan" name="tujuan" placeholder="Contoh: Semarang - Gudang A" required>
+            </div>
+
+            <div class="form-group">
+                <label for="tensi">Tensi Darah (mmHg)</label>
+                <input type="text" id="tensi" name="tensi" placeholder="Contoh: 120/80" required>
+            </div>
+
+            <div class="form-group">
+                <label for="oximeter">Oximeter (SpO2 %)</label>
+                <input type="number" id="oximeter" name="oximeter" placeholder="Contoh: 98" min="0" max="100" required>
+            </div>
+
+            <button type="submit">Simpan Data</button>
+        </form>
+    </div>
+
+    <script>
+        // Set tanggal otomatis ke hari ini
+        document.getElementById('tanggal').valueAsDate = new Date();
+
+        // 1. FUNGSI UNTUK MEMBACA EXCEL DARI GITHUB
+        async function loadMasterData() {
+            document.getElementById('loadDriver').style.display = 'inline';
+            document.getElementById('loadNopol').style.display = 'inline';
+
+            try {
+                // Pastikan nama file ini sama dengan yang di-upload ke GitHub
+                const response = await fetch('Master_Data_Logistik.xlsx');
+                const arrayBuffer = await response.arrayBuffer();
+                
+                // Proses membaca workbook Excel
+                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                
+                // A. Tarik data dari Sheet "Master_Driver"
+                const driverSheet = workbook.Sheets['Master_Driver'];
+                if(driverSheet) {
+                    const driverData = XLSX.utils.sheet_to_json(driverSheet);
+                    const driverSelect = document.getElementById('namaDriver');
+                    driverData.forEach(row => {
+                        // Ambil kolom 'Nama Driver' yang statusnya 'Aktif'
+                        if (row['Nama Driver'] && row['Status'] === 'Aktif') {
+                            let opt = document.createElement('option');
+                            opt.value = row['Nama Driver'];
+                            opt.innerHTML = row['Nama Driver'];
+                            driverSelect.appendChild(opt);
+                        }
+                    });
+                }
+
+                // B. Tarik data dari Sheet "Master_Kendaraan"
+                const nopolSheet = workbook.Sheets['Master_Kendaraan'];
+                if(nopolSheet) {
+                    const nopolData = XLSX.utils.sheet_to_json(nopolSheet);
+                    const nopolSelect = document.getElementById('nopol');
+                    nopolData.forEach(row => {
+                        // Ambil kolom 'Nopol' yang statusnya 'Aktif'
+                        if (row['Nopol'] && row['Status'] === 'Aktif') {
+                            // Format nopol dengan jenis kendaraannya biar lebih jelas
+                            let optValue = row['Nopol'];
+                            let optText = row['Nopol'] + ' - ' + (row['Jenis Kendaraan'] || '');
+                            let opt = document.createElement('option');
+                            opt.value = optValue;
+                            opt.innerHTML = optText;
+                            nopolSelect.appendChild(opt);
+                        }
+                    });
+                }
+
+                document.getElementById('loadDriver').style.display = 'none';
+                document.getElementById('loadNopol').style.display = 'none';
+
+            } catch (error) {
+                console.error("Gagal memuat Excel: ", error);
+                document.getElementById('loadDriver').innerHTML = "(Gagal memuat, pastikan file Excel ada)";
+                document.getElementById('loadNopol').innerHTML = "(Gagal memuat, pastikan file Excel ada)";
+            }
+        }
+
+        // Panggil fungsi saat halaman pertama kali dibuka
+        window.onload = loadMasterData;
+
+        // 2. FUNGSI UNTUK KIRIM DATA KE GOOGLE SHEETS (Tetap sama)
+        const scriptURL = 'https://script.google.com/macros/s/AKfycbwkEqfR1q4iRrbKHOCpforEs3yzgWp4GpUyjpZXeH2KjqJJC92dJgfMh5pQOyPCcOsn_w/exec';
+        const form = document.getElementById('driverForm');
+        const btnSubmit = form.querySelector('button');
+
+        form.addEventListener('submit', e => {
+            e.preventDefault();
+            
+            btnSubmit.innerHTML = 'Menyimpan...';
+            btnSubmit.disabled = true;
+            
+            fetch(scriptURL, { method: 'POST', body: new FormData(form)})
+                .then(response => {
+                    alert('Data berhasil disimpan! Nomor urut sudah otomatis terbuat di Google Sheets.');
+                    form.reset(); 
+                    document.getElementById('tanggal').valueAsDate = new Date(); 
+                    btnSubmit.innerHTML = 'Simpan Data';
+                    btnSubmit.disabled = false;
+                })
+                .catch(error => {
+                    console.error('Error!', error.message);
+                    alert('Gagal menyimpan data. Pastikan koneksi internet lancar.');
+                    btnSubmit.innerHTML = 'Simpan Data';
+                    btnSubmit.disabled = false;
+                });
+        });
+    </script>
+
+</body>
+</html>
